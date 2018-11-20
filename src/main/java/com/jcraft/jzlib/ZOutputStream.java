@@ -92,8 +92,6 @@ public class ZOutputStream extends OutputStream {
 
     }
     while(z.avail_in>0 || z.avail_out==0);
-    out.flush();
-
   }
 
   public int getFlushMode() {

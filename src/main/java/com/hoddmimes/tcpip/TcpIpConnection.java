@@ -1,7 +1,8 @@
 package com.hoddmimes.tcpip;
 
 import com.hoddmimes.tcpip.crypto.DH;
-import com.hoddmimes.tcpip.crypto.Crypto;
+import com.hoddmimes.tcpip.crypto.DecryptInputStream;
+import com.hoddmimes.tcpip.crypto.EncryptOutputStream;
 import com.hoddmimes.tcpip.impl.*;
 import com.hoddmimes.tcpip.messages.*;
 
@@ -12,7 +13,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,11 +52,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 	private volatile ByteCountingInputStream mUnCompStatInputStream = null;
 	private volatile ByteCountingInputStream mCompStatInputStream = null;
 
-	private Crypto 	mEncrypt;
-	private Crypto mDecrypt;
-
-	private ByteBuffer mCryptoBuffer;
-
+	private volatile DataInputStream  mInSocket;
+	private volatile DataOutputStream mOutSocket;
 
 
 	TcpIpConnection( Socket pSocket, 
@@ -70,31 +67,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 		mConnectionType = pConnectionType;
 		mClientServerCompatible = true; // let us assume that we are compatible i.e. version and connection type
 
-		if ((pConnectionType != null) && (pConnectionType.equals(TcpIpConnectionTypes.Encrypt) || pConnectionType.equals(TcpIpConnectionTypes.Compression_Encrypt))) {
-			adjustCryptoBuffers( 1024 );
-		}
+
 
 		mConnectionTime = new Date();
 		mIndex = cThreadIndex.incrementAndGet();
 		try {
 			mSocket.setTcpNoDelay(true);
 			mSocket.setKeepAlive(true);
+			mInSocket = new DataInputStream( mSocket.getInputStream());
+			mOutSocket = new DataOutputStream( mSocket.getOutputStream());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-
-
-	private void adjustCryptoBuffers( int pSize  ) {
-		if (mCryptoBuffer == null) {
-			int tSize = Math.max( pSize, 1024);
-			mCryptoBuffer = ByteBuffer.allocate( tSize );
-		} else if (pSize > mCryptoBuffer.capacity()) {
-			mCryptoBuffer = ByteBuffer.allocate( pSize );
-		} else if ((pSize < mCryptoBuffer.capacity()) && ( mCryptoBuffer.capacity() > 2048)) {
-			mCryptoBuffer = ByteBuffer.allocate( pSize );
-		}
-		mCryptoBuffer.clear();
 	}
 
 	private void trace( String pText ) {
@@ -111,15 +95,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 		DH tDHData = (isClient()) ? synchronizeParametersWithServer() : synchronizeParametersWithClient();
 
-		// If encryption requested
 		if (isEncrypted()) {
-			mDecrypt = new Crypto(false, tDHData.getSharedSecretKey());
-			mEncrypt = new Crypto(true,tDHData.getSharedSecretKey());
-			tDHData = null;
+			mIn = new DataInputStream(new DecryptInputStream(mSocket.getInputStream(), tDHData.getSharedSecretKey()));
+			mOut = new DataOutputStream(new EncryptOutputStream(mSocket.getOutputStream(), tDHData.getSharedSecretKey()));
+		} else {
+			mIn = new DataInputStream(mSocket.getInputStream());
+			mOut = new DataOutputStream(mSocket.getOutputStream());
 		}
-
-		mIn = new DataInputStream(mSocket.getInputStream());
-		mOut =  new DataOutputStream(mSocket.getOutputStream());
 
 		// If Compression requested
 
@@ -280,12 +262,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 				mIn.close();
 				mOut.close();
 				mSocket.close();
-				if (mEncrypt != null) {
-					mEncrypt = null;
-				}
-				if (mDecrypt != null) {
-					mDecrypt = null;
-				}
 
 			} catch (IOException e) {
 			}
@@ -324,25 +300,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 	{
 
 		synchronized (this) {
-			if (isEncrypted()) {
-				adjustCryptoBuffers( pLength + CRYPTO_HEADER_SIZE + mEncrypt.getBlockSize());
+			mOut.writeInt(MAGICAL_SIGN);
+			mOut.writeInt(pLength);
+			mOut.write(pBuffer, pOffset, pLength);
 
-                mCryptoBuffer.clear();
-				mCryptoBuffer.putInt(MAGICAL_SIGN);
-				mCryptoBuffer.putInt(0); // Put an entry for the length field, updated later
-				mEncrypt.encrypt( pBuffer, pOffset, mCryptoBuffer, pLength);
-
-				//Update the total message length. It is the length of the mCryptoBuffer
-				// minus the length for the magical sign and the length field itself.
-				int tSize = mCryptoBuffer.position() - Integer.BYTES - Integer.BYTES;
-				mCryptoBuffer.putInt(Integer.BYTES, tSize );
-                mOut.write(mCryptoBuffer.array(), 0, mCryptoBuffer.position());
-
-			} else {
-				mOut.writeInt(MAGICAL_SIGN);
-				mOut.writeInt(pLength);
-				mOut.write(pBuffer, pOffset, pLength);
-			}
 			if (pFlushFlag) {
 				mOut.flush();
             }
@@ -399,15 +360,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 					return;
 				}
 
-
 				tSize = mIn.readInt();
 				tBuffer = new byte[tSize];
 				mIn.readFully(tBuffer);
 
-				if (isEncrypted()) {
-					adjustCryptoBuffers( tSize );
-					tBuffer = mDecrypt.decrypt( tBuffer );
-				}
 				mCallback.tcpipMessageRead(this, tBuffer);
 
 			} catch (IOException e) {

@@ -1,10 +1,16 @@
 package com.hoddmimes.tcpip.test;
 
-import com.hoddmimes.tcpip.crypto.Crypto;
+import com.hoddmimes.tcpip.crypto.AESEngine;
+import com.hoddmimes.tcpip.crypto.CBCBlockCipher;
+import com.hoddmimes.tcpip.crypto.DecryptInputStream;
+import com.hoddmimes.tcpip.crypto.EncryptOutputStream;
 import org.junit.Test;
 import org.junit.Assert;
 
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
 import java.security.InvalidParameterException;
 import java.util.Random;
@@ -17,11 +23,24 @@ public class TestEncryption
     public TestEncryption() {
     }
 
-    private Throwable initCrypto( boolean pEncrypt, byte[] pSecretKey ) {
+    private Throwable initCrypto(boolean pEncrypt, byte[] pSecretKey) {
+        byte[] iv;
+
         try {
-            Crypto c = new Crypto( pEncrypt, pSecretKey );
-        }
-        catch( Throwable e) {
+            PipedInputStream tInStream = new PipedInputStream();
+            PipedOutputStream tOutStream = new PipedOutputStream(tInStream);
+
+            EncryptOutputStream tEncrypt;
+            DecryptInputStream tDecrypt;
+
+
+            if (pEncrypt) {
+                tEncrypt = new EncryptOutputStream(tOutStream, pSecretKey);
+            } else {
+                tDecrypt = new DecryptInputStream(tInStream, pSecretKey);
+            }
+
+        } catch (Throwable e) {
             return e;
         }
         return null;
@@ -45,11 +64,13 @@ public class TestEncryption
         r.nextBytes( tKey );
         Assert.assertEquals(null, initCrypto(true, tKey));
 
+        Assert.assertEquals(null, initCrypto(false, tKey));
+
         tKey = new byte[(128/8)];
         r.nextBytes( tKey );
         Assert.assertEquals(initCrypto(true, tKey).getClass(), InvalidParameterException.class);
 
-        Assert.assertEquals(initCrypto(true, null).getClass(), InvalidParameterException.class);
+        Assert.assertEquals(initCrypto(false, tKey).getClass(), InvalidParameterException.class);
     }
 
     private boolean compareByteArrays( byte[] a , byte[] b) {
@@ -76,8 +97,13 @@ public class TestEncryption
         tKey = new byte[(256/8)];
         r.nextBytes( tKey );
 
-        Crypto tEncrypt = new Crypto( true, tKey );
-        Crypto tDecrypt = new Crypto( false, tKey );
+        PipedInputStream  tInStream = new PipedInputStream( 8192 );
+        PipedOutputStream tOutStream = new PipedOutputStream( tInStream );
+
+
+
+        EncryptOutputStream tEncrypt = new EncryptOutputStream( tOutStream, tKey );
+        DecryptInputStream tDecrypt = new DecryptInputStream( tInStream, tKey );
 
         byte[] xBuffer, yBuffer;
         ByteBuffer cBuffer;
@@ -85,13 +111,12 @@ public class TestEncryption
         for( int i = 1; i < 1000; i++) {
             int tSize = i;
             xBuffer = new byte[tSize];
-            cBuffer = ByteBuffer.allocate( tSize + Integer.BYTES + tEncrypt.getBlockSize());
+            yBuffer = new byte[tSize];
             r.nextBytes( xBuffer );
-            tEncrypt.encrypt( xBuffer,0, cBuffer, tSize );
-            byte[] nba = new byte[ cBuffer.position()];
-            cBuffer.flip();
-            cBuffer.get( nba );
-            yBuffer = tDecrypt.decrypt( nba );
+            tEncrypt.write( xBuffer );
+            tEncrypt.flush();
+            tDecrypt.readFully( yBuffer );
+
             if (!compareByteArrays(xBuffer,yBuffer)) {
                 return false;
             }
@@ -101,27 +126,28 @@ public class TestEncryption
 
     public boolean encryptTestRandom() throws Exception {
         Random r = new Random();
-        byte[] tKey;
+        byte[] tKey, xBuffer, yBuffer;
 
         tKey = new byte[(256/8)];
         r.nextBytes( tKey );
 
-        Crypto tEncrypt = new Crypto( true, tKey );
-        Crypto tDecrypt = new Crypto( false, tKey );
+        PipedInputStream  tInStream = new PipedInputStream( (1024 * 20) );
+        PipedOutputStream tOutStream = new PipedOutputStream( tInStream );
 
-        byte[] xBuffer, yBuffer;
-        ByteBuffer cBuffer;
+        EncryptOutputStream tEncrypt = new EncryptOutputStream( tOutStream, tKey );
+        DecryptInputStream tDecrypt = new DecryptInputStream( tInStream, tKey );
+
+
 
         for( int i = 0; i < 10000; i++) {
-            int tSize = 1 + Math.abs(r.nextInt( 10000));
+            int tSize = 1 + Math.abs(r.nextInt( (1024 * 16)));
             xBuffer = new byte[tSize];
-            cBuffer = ByteBuffer.allocate( tSize + Integer.BYTES + tEncrypt.getBlockSize());
+            yBuffer = new byte[tSize];
+
             r.nextBytes( xBuffer );
-            tEncrypt.encrypt( xBuffer,0, cBuffer, tSize );
-            byte[] nba = new byte[ cBuffer.position()];
-            cBuffer.flip();
-            cBuffer.get( nba );
-            yBuffer = tDecrypt.decrypt( nba );
+            tEncrypt.write( xBuffer );
+            tEncrypt.flush();
+            tDecrypt.readFully( yBuffer );
             if (!compareByteArrays(xBuffer,yBuffer)) {
                 return false;
             }

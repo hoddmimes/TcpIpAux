@@ -157,6 +157,7 @@ public class Client implements TcpIpConnectionCallbackInterface
         mMsgSent = 0;
         mMessage = buildMessage();
         try {
+            System.out.println("Sending message: " + mMessage.length());
             mClient.write(mMessage.getBytes(), true);
         }
         catch( IOException e) {
@@ -201,6 +202,7 @@ public class Client implements TcpIpConnectionCallbackInterface
         }
         mMessage = buildMessage();
         try {
+            System.out.println("Sending message: " + mMessage.length());
             pConnection.write(mMessage.getBytes(), true);
         }
         catch( IOException e) {

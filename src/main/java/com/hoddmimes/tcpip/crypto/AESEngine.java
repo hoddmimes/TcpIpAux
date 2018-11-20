@@ -363,6 +363,7 @@ private static final int[] Tinv0 =
         byte[]   pSharedKey)
     {
 
+
         WorkingKey = generateWorkingKey(pSharedKey, forEncryption);
         this.forEncryption = forEncryption;
     }
