@@ -17,6 +17,6 @@ The encryption is AES 256 bit encryption with anonymous Diffe/Hellman key exchan
 The ZLIB is based on the on the package from JCraft http://www.jcraft.com/jzlib/
 
 A client and server sample is found in the package com.hoddmimes.tcpip.sample
-* ![**Client**] (https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Client.java "Client Sample")
-* **Server** com.hoddmimes.tcpip.sample.Server 
+* ![Client] (https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Client.java "Client Sample")
+* ![Server] (https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Client.java "Server Sample")
 
