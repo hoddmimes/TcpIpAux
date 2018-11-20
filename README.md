@@ -10,9 +10,7 @@ are available
 * **plain**, plain socket without encryption and compression
 * **encrypt**, AES 256 bit encryption
 * **compression**, ZLIB compression
-* **encryption_compression**, AES 256 bit encryption and compression. Not the best combination since the compression 
-is currently done before the compression. Compresion of encrypted data is pretty useless since it basically is random 
-data. 
+* **encryption_compression**, AES 256 bit encryption and compression. 
 
 
 The encryption is AES 256 bit encryption with anonymous Diffe/Hellman key exchange. 

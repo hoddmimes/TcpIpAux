@@ -21,7 +21,7 @@ public class TestNetwork
 
     @Test
     public void testEcryptConnection() {
-      Assert.assertEquals(null, runEcryptConnection(true));
+      Assert.assertEquals(null, runEcryptConnection(false));
     }
 
     @Test
