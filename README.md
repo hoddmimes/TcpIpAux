@@ -1,8 +1,8 @@
 # TcpIpAux
 Java TCP/IP wrapper with optional encryption and ZLIB compression.
 The utility is message/package oriented rather than stream oriented.
-Implicating that clients/server are send/receiving messages i.e. (buffer buffers).
-The interface is asynchronous implicating that the wrapper starts a reading thread and deliver read messages 
+Implicating that clients/server are send/receiving messages i.e. (byte buffers/vectors).
+The interface is asynchronous, implicating that the wrapper starts a reading thread and deliver read messages 
 via a callback when messages becomes available
 
 When creating a client it's possible to define whatever compression and or encryption should be used or not. Three modes
