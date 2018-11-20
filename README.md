@@ -20,4 +20,4 @@ A client and server sample is found in the package com.hoddmimes.tcpip.sample
 * **Client** com.hoddmimes.tcpip.sample.Client 
 * **Server** com.hoddmimes.tcpip.sample.Server 
 
-![alt text](https://github.com/adam-p/markdown-here/raw/master/src/common/images/icon48.png "Logo Title Text 1")
+![alt text](https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Client.java "Client Sample")
