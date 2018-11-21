@@ -15,7 +15,7 @@ import javax.net.ssl.SSLServerSocketFactory;
 
 
 /**
- * Class for establishing server listeners. 
+ * Class for establishing a TCP/IP server listener.
  */
 public class TcpIpServer extends Thread {
 
@@ -60,6 +60,9 @@ public class TcpIpServer extends Thread {
 		start();
 	}
 
+	/**
+	 * Close the server socket and stops accepting connection
+	 */
 	public void close() {
 		if (mServerSocket != null) {
 			mCloseFlag = true;
@@ -68,6 +71,9 @@ public class TcpIpServer extends Thread {
 		}
 	}
 
+	/**
+	 * Background thread accepting inbound connection
+	 */
 	@Override
 	public void run() {
 		if (mConnectionType != null) {

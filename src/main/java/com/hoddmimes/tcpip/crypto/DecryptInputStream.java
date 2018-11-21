@@ -23,6 +23,8 @@ public class DecryptInputStream extends FilterInputStream {
      *
      * @param pTcpIpSocketInputStream the underlying input stream, or <code>null</code> if
      *           this instance is to be created without an underlying stream.
+     *
+     *  @param pSharedSecretKey common secret key shared between client and server
      */
     public  DecryptInputStream(InputStream pTcpIpSocketInputStream, byte[] pSharedSecretKey) {
         super(pTcpIpSocketInputStream);

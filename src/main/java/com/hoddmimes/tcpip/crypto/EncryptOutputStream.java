@@ -23,6 +23,8 @@ public class EncryptOutputStream extends FilterOutputStream {
      *            the field <tt>this.out</tt> for later use, or
      *            <code>null</code> if this instance is to be
      *            created without an underlying stream.
+     *
+     * @param pSharedSecretKey, common secret (256 bit) key used by client and server.
      */
     public EncryptOutputStream(OutputStream pTcpIpSocketOutputStream, byte[] pSharedSecretKey ) {
         super(pTcpIpSocketOutputStream);

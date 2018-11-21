@@ -1,6 +1,7 @@
 package com.hoddmimes.tcpip;
 
 import com.hoddmimes.tcpip.crypto.CBCBlockCipher;
+import com.hoddmimes.tcpip.messages.IncompatibleConnectionException;
 
 import java.io.DataInputStream;
 import java.io.FileInputStream;
@@ -33,9 +34,11 @@ public class TcpIpClient
 	 * @param pPort the tcp/ip port on which the server will accept inbound connections on 
 	 * @param pCallback interface to be called when messages from the server has been read or to signal communication error
 	 * @return handle to the connection
-	 * @throws IOException, error exception when failing to create and establish connection 
+	 * @throws IOException error exception when failing to create and establish connection
+	 * @throws IncompatibleConnectionException  thrown when connecting to a server being started to accept s specific
+	 * features i.e. plain, compressed, encrypted or eompressed_encrypted connections.
 	 */
-	public static TcpIpConnectionInterface connect(String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws Exception {
+	public static TcpIpConnectionInterface connect(String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException {
 		return TcpIpClient.connect(TcpIpConnectionTypes.Plain, pHost, pPort, pCallback);
 	}
 
@@ -46,10 +49,12 @@ public class TcpIpClient
 	 * @param pPort the tcp/ip port on which the server will accept inbound connections on 
 	 * @param pCallback interface to be called when messages from the server has been read or to signal communication error
 	 * @return handle to the connection
-	 * @throws IOException, error exception when failing to create and establish connection 
+	 * @throws IOException  error exception when failing to create and establish connection
+	 * @throws IncompatibleConnectionException thrown when connecting to a server being started to accept s specific
+	 * features i.e. plain, compressed, encrypted or eompressed_encrypted connections.
 	 */
 	public static TcpIpConnectionInterface connect(TcpIpConnectionTypes pConnectionType,
-			String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws Exception
+			String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException
 	{
 
 			SocketAddress tEndpointAddress = new InetSocketAddress(pHost, pPort);

@@ -9,6 +9,11 @@ repositories {
     mavenCentral()
 }
 
+javadoc {
+    source = sourceSets.main.allJava
+    classpath = configurations.compile
+}
+
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }

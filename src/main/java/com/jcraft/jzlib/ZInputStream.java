@@ -137,6 +137,7 @@ public class ZInputStream extends FilterInputStream {
 
   /**
    * Returns the total number of bytes input so far.
+   * @return total number of input bytes provided
    */
   public long getTotalIn() {
     return z.total_in;
@@ -144,11 +145,16 @@ public class ZInputStream extends FilterInputStream {
 
   /**
    * Returns the total number of bytes output so far.
+   * @return, total number of input bytes provided
    */
   public long getTotalOut() {
     return z.total_out;
   }
 
+  /**
+   * Close the input stream
+   * @throws IOException error when closing the stream
+   */
   public void close() throws IOException{
     in.close();
   }

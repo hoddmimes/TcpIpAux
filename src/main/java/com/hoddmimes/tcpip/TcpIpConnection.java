@@ -19,17 +19,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
- * 
+ * Class representing a outbound (client) or inbound (connection) tcp/ip connection.
+ * When an application would like to send data the write methods are invoked.
  *
+ * Read data is delivered to application via the callback specified when the connection was initiated see
+ * {@link TcpIpClient#connect TcpIpClient.connect} or when the server was declared and started see
+ * {@link TcpIpServer TcpIpServer}
  */
  class TcpIpConnection extends Thread implements TcpIpConnectionInterface, TcpIpCountingInterface
 {
-	static enum ConnectionDirection {In, Out};
+	static enum ConnectionDirection {In, Out}; // inbound (server accepted connection) or outboud (client initiated connection)
 
 	private int STREAM_BUFFER_SIZE = (16 * 1024); // 16K
 
 	private static final int MAGICAL_SIGN = 0x504f4242;
-	private static final int CRYPTO_HEADER_SIZE = 3 * Integer.BYTES; // MagicSign + Msg Length on the net (padding inckluded) + True User Data Length
+	private static final int CRYPTO_HEADER_SIZE = 3 * Integer.BYTES; // MagicSign + Msg Length on the net (padding included) + True User Data Length
 
 	private static SimpleDateFormat cSDF = new SimpleDateFormat("HH:mm:ss.SSS");
 	private static AtomicInteger cThreadIndex = new AtomicInteger(0);
@@ -55,7 +59,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 	private volatile DataInputStream  mInSocket;
 	private volatile DataOutputStream mOutSocket;
 
-
+	/**
+	 * Create and initiated a TCP/IP wrapper. A TcpIpConnection returned when a connection is outbound initiated
+	 * see {@link TcpIpClient#connect TcpIpClient.connect} or when a server is accepting and inbound connection
+	 * see {@link TcpIpServerCallbackInterface#tcpipInboundConnection TcpIpConnectionInterface} inbound connection}
+	 * @param pSocket
+	 * @param pConnectionDirection
+	 * @param pConnectionType
+	 * @param pCallback
+	 */
 	TcpIpConnection( Socket pSocket, 
 			ConnectionDirection pConnectionDirection, 
 			TcpIpConnectionTypes pConnectionType, 
@@ -85,13 +97,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 		//System.out.println("[" + mConnectionDirection +"] " + pText + " thread: " + this.getName());
 	}
 
+	/**
+	 * Initialize the communication with the server/client counter party.
+	 * Server, may be configured to force a protocol stack (i.e. compressin and/or encryption) or accept whatever the client chose
+	 * If the server initialize the TcpIpConnection with a ConnectionType (i.e. not null) it must match the client connection type in the initial message
+	 * If connection type is not set the server will adopt to whatever the client has chosen.
+	 *
+	 * If the connection is a outbound(client) connection, the client will send a {@link InitMsgRqst InitMsgRqst}, specifying version, connection type and
+	 * encryption parameters if encryption is enabled.
+	 * The server will response with a {@link InitMsgRsp InitMsgRsp } flag indicating whatever it accept the client or not, error message if applicable and
+	 * its encryption parameters is encryption should be used.
+	 *
+	 * @throws IOException, error in transmission
+	 * @throws IncompatibleConnectionException, server incompatible with what the client requests
+	 */
 	protected  void init() throws IOException, IncompatibleConnectionException
 	{
-		// This class is used by servers and clients to wrap the transport stack.
-		// Server, may be configured to force a protocol stack (i.e. compressin and/or encryption) or accept whatever the client chose
-		// If the server initialize the TcpIpConnection with a ConnectionType (i.e. not null) it must match the client connection type in the initial message
-		// If connection type is not set the server will adopt to whatever the client has chosen.
-
 
 		DH tDHData = (isClient()) ? synchronizeParametersWithServer() : synchronizeParametersWithClient();
 
@@ -172,6 +193,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 		DataInputStream tIn = new DataInputStream(mSocket.getInputStream());
 		DataOutputStream tOut = new DataOutputStream(mSocket.getOutputStream());
 
+		/**
+		 * read message message size. Check whatever the size of the following user data is resonable
+		 * If not just ignore the connection.
+		 */
 		int tSize = tIn.readInt();
 		if ((tSize <= 0) && (tSize >= 4096)) {
 			throw new IOException("tcpIpAux: Most likely an intial garbage message");
@@ -242,16 +267,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 		return false;
 	}
 
+	/**
+	 * Associate a user defined object with the TcpIpConnection
+	 * @param pObject user object
+	 */
 	@Override
 	public void setUserCntx(Object pObject) {
 		mUserCntx = pObject;
 	}
 
+	/**
+	 *
+	 * @return null, or the user object associated withe the TcpIpConnection
+	 */
 	@Override
 	public Object getUserCntx() {
 		return mUserCntx;
 	}
 
+	/**
+	 * Close down the TcpIpConnection
+	 */
 	@Override
 	public void close() {
 		synchronized (this) {
@@ -269,18 +305,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 	}
 
+	/**
+	 * Flush the connection i.e. flush pending data to underlying protocol stacks
+	 * @throws IOException
+	 */
 	public void flush() throws IOException {
 		mOut.flush();
 	}
 
+	/**
+	 * Gets the callback interface where to be invoked when the client/server app should be notified about asynchronous events.
+	 * @return {@links TcpIpConnectionCallbackInterface TcpIpConnectionCallbackInterface }
+	 */
 	public TcpIpConnectionCallbackInterface getCallbackInterface() {
 		return this.mCallback;
 	}
 
+	/**
+	 * Returns the remote host address with which the connection is communicating
+	 * @return, remote host address string
+	 */
 	public String getRemoteHost() {
 		return mSocket.getRemoteSocketAddress().toString();
 	}
 
+	/**
+	 * Returns the remote port with which the connection is communicating
+	 * @return, port, int
+	 */
 	public int getRemotePort() {
 		return mSocket.getPort();
 	}
@@ -289,13 +341,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 			write(pBuffer,0,pBuffer.length,true);
 	}
 
+	/**
+	 * Method used to send data to the remote client/server
+	 * @param pBuffer byte vector to be sent to counterpart.
+	 * @param pOffset starting position within vector
+	 * @param pLength length of data to be sent
+	 * @throws IOException
+	 */
 	public void write(byte[] pBuffer, int pOffset, int pLength) throws IOException 
 	{
 		write(pBuffer,pOffset,pLength,true);
 	}
-	
-	
-	
+
+
+	/**
+	 * Method used to send data to the remote client/server
+	 * @param pBuffer byte vector to be sent to counterpart.
+	 * @param pOffset starting position within vector
+	 * @param pLength length of data to be sent
+	 * @param pFlushFlag, flush data to counterparty
+	 * @throws IOException
+	 */
 	public void write(byte[] pBuffer, int pOffset, int pLength, boolean pFlushFlag) throws IOException 
 	{
 
@@ -309,10 +375,21 @@ import java.util.concurrent.atomic.AtomicInteger;
             }
 		}
 	}
+
+	/**
+	 * ethod used to send data to the remote client/server
+	 * @param pBuffer byte vector to be sent to counterpart.
+	 * @param pFlushFlag, flush data to counterparty
+	 * @throws IOException
+	 */
 	public void write(byte[] pBuffer, boolean pFlushFlag) throws IOException {
 		write( pBuffer,0,pBuffer.length, pFlushFlag );
 	}
 
+	/**
+	 * Connection related info data.
+	 * @return info related to the connection
+	 */
 	@Override
 	public String toString() {
 		return this.getConnectionInfo();
@@ -325,6 +402,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 				+ " conn time: " + cSDF.format(mConnectionTime) + "]";
 	}
 
+	/**
+	 * Read thread.
+	 */
 	@Override
 	public void run() {
 		byte[] tBuffer;
@@ -376,16 +456,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 		}
 	}
 
+	/**
+	 * Return number of bytes read (uncompressed)
+	 * @return, bytes read
+	 */
 	@Override
 	public long getBytesRead() {
 		return this.mUnCompStatInputStream.getBytesRead();
 	}
 
+	/**
+	 * Return number of bytes written (uncompressed)
+	 * @return, bytes written
+	 */
 	@Override
 	public long getBytesWritten() {
 		return this.mUnCompStatOutputStream.getBytesWritten();
 	}
 
+	/**
+	 * Return read compression rate
+	 * @return, Rate i.e. 0.30 is equal to 30% compression
+	 */
 	@Override
 	public double getInputCompressionRate() {
 		if (isCompressed()) {
@@ -397,6 +489,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 		return 0D;
 	}
 
+	/**
+	 * Return write compression rate
+	 * @return, Rate i.e. 0.30 is equal to 30% compression
+	 */
 	@Override
 	public double getOutputCompressionRate() {
 		if (isCompressed()) {

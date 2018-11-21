@@ -49,6 +49,7 @@ public class CBCBlockCipher
      * @param encrypting if true the cipher is initialised for
      *  encryption, if false for decryption.
      * @param pSharedKey the key and other data required by the cipher.
+     * @param pInitVector initial byte vector used to initiate the CBC cipher (must be 16 bytes)
      * @exception IllegalArgumentException if the params argument is
      * inappropriate.
      */

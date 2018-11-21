@@ -141,6 +141,7 @@ public class ZOutputStream extends OutputStream {
 
   /**
    * Returns the total number of bytes input so far.
+   * @return, total number of bytes provided for compression
    */
   public long getTotalIn() {
     return z.total_in;
@@ -148,6 +149,7 @@ public class ZOutputStream extends OutputStream {
 
   /**
    * Returns the total number of bytes output so far.
+   * @return total of of bytes processes
    */
   public long getTotalOut() {
     return z.total_out;
