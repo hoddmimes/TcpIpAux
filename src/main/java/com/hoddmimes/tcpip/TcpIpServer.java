@@ -40,7 +40,11 @@ public class TcpIpServer extends Thread {
 
 	/**
 	 * Establish and start server listener. Optional to start server with compression and/or encryption
-	 * @param pConnectionType type of session @see {@link TcpIpConnectionTypes}
+	 * @param pConnectionType type of session @see {@link TcpIpConnectionTypes}. <i><b>Note!</b> if passing null as parameter
+	 *                        the server will will not verify incomming client connection. The server will adopt to whatever
+	 *                        the client connection request, plain,copression and/or encryption</i> If a connection type is
+	 *                        specified the server will verify that the incomming connection are initiated/started
+	 *                        with same features.
 	 * @param pAcceptPort tcp/ip port to accept connection on 
 	 * @param pAcceptInterface the address of the network interface through which connections will be accepted. If being null the server will accept connection on ADDR_ANY interface
 	 * @param pCallback callback interface to be invoked when receiving inbound connection, messages read and fatal error notifications 
