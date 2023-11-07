@@ -7,7 +7,7 @@ import java.util.List;
 
 
 public class DH {
-    private static int SECRET_KEY_BYTE_LENGTH = 384;
+    private static final int SECRET_KEY_BYTE_LENGTH = 384;
     public static final BigInteger DEFAULT_PRIME = new BigInteger("b25c9fccfb28e3cbb14f34aa55194d066e22ed257e18ea2368f40b82559f7590b5e9b5ec819b3fb8358c9cadd09d88b33" +
             "729b4935dfe4692c91db26faa896193c4eb5069cebb6857bc97ad98dbfb1f6f2c287d34e02d3923df32cc2e9035c8a09af280943b637a8402beb846d8d3f69c343066a1fe164e0d5c1bfb5f548e5a" +
             "6ee50ce917eb1df5de4f105a7473fcaac056cb7e3527b971ce6573540a7545b8dda7ad020f31dc3e25d1afa7289ae92fefc35aa650e6bbc18775037863e44df071b0699a85c11d39a772f42c768a6" +
@@ -15,10 +15,10 @@ public class DH {
 
     public static final BigInteger DEFAULT_G = new BigInteger("3");
 
-    private BigInteger mPrime;          // P
-    private BigInteger mCommonBase;     // G
-    private BigInteger mMyPublicKey;
-    private BigInteger mMySecretKey;
+    private final BigInteger mPrime;          // P
+    private final BigInteger mCommonBase;     // G
+    private final BigInteger mMyPublicKey;
+    private final BigInteger mMySecretKey;
     private byte[] mSecretKey;
 
 

@@ -1,17 +1,14 @@
 package com.hoddmimes.tcpip.test;
 
-import com.hoddmimes.tcpip.crypto.AESEngine;
-import com.hoddmimes.tcpip.crypto.CBCBlockCipher;
+
 import com.hoddmimes.tcpip.crypto.DecryptInputStream;
 import com.hoddmimes.tcpip.crypto.EncryptOutputStream;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.nio.ByteBuffer;
 import java.security.InvalidParameterException;
 import java.util.Random;
 
@@ -48,7 +45,7 @@ public class TestEncryption
 
     private Object instanceOf( Class pClass ) {
         try {
-            return pClass.newInstance();
+            return pClass.getDeclaredConstructor().newInstance();
         }
         catch(Exception e) {
             return null;
@@ -62,9 +59,9 @@ public class TestEncryption
 
         tKey = new byte[(256/8)];
         r.nextBytes( tKey );
-        Assert.assertEquals(null, initCrypto(true, tKey));
+        Assert.assertNull(initCrypto(true, tKey));
 
-        Assert.assertEquals(null, initCrypto(false, tKey));
+        Assert.assertNull(initCrypto(false, tKey));
 
         tKey = new byte[(128/8)];
         r.nextBytes( tKey );
@@ -106,10 +103,9 @@ public class TestEncryption
         DecryptInputStream tDecrypt = new DecryptInputStream( tInStream, tKey );
 
         byte[] xBuffer, yBuffer;
-        ByteBuffer cBuffer;
 
-        for( int i = 1; i < 1000; i++) {
-            int tSize = i;
+        for( int tSize = 1; tSize < 1000; tSize++) {
+
             xBuffer = new byte[tSize];
             yBuffer = new byte[tSize];
             r.nextBytes( xBuffer );
@@ -157,8 +153,8 @@ public class TestEncryption
 
     @Test
     public void testEncryption() throws Exception {
-       Assert.assertEquals( true, encryptTestBufferSteps() );
-       Assert.assertEquals( true, encryptTestRandom() );
+        Assert.assertTrue(encryptTestBufferSteps());
+        Assert.assertTrue(encryptTestRandom());
     }
 
 

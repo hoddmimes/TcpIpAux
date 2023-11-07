@@ -1,15 +1,9 @@
 package com.hoddmimes.tcpip.test;
 
-import com.hoddmimes.tcpip.TcpIpClient;
-import com.hoddmimes.tcpip.TcpIpConnectionCallbackInterface;
-import com.hoddmimes.tcpip.TcpIpConnectionInterface;
 import com.hoddmimes.tcpip.TcpIpConnectionTypes;
 
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.io.IOException;
-import java.util.Random;
 
 public class TestNetwork
 {
@@ -21,7 +15,7 @@ public class TestNetwork
 
     @Test
     public void testEcryptConnection() {
-      Assert.assertEquals(null, runEcryptConnection(false));
+      Assert.assertEquals(null, runEncryptConnection(false));
     }
 
     @Test
@@ -74,7 +68,7 @@ public class TestNetwork
         return tResult;
     }
 
-    private Object runEcryptConnection(boolean pTrace) {
+    private Object runEncryptConnection(boolean pTrace) {
         NetworkServer tServer = new NetworkServer(null);
         tServer.startServer(pTrace);
         try {

@@ -12,7 +12,7 @@ import java.util.Random;
 
 public class Client implements TcpIpConnectionCallbackInterface
 {
-    private static SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
     private int mMinMsgSize = 128;
     private int mMaxMsgSize = 2048;
@@ -22,16 +22,18 @@ public class Client implements TcpIpConnectionCallbackInterface
 
     private volatile int mMsgSent;
     private volatile long mBytesSent;
+    private volatile long mStartTime;
+
     private volatile String mMessage;
 
     private boolean mVerifyMessage = true;
 
     private TcpIpConnectionInterface mClient;
-    private Random mRandom;
+    private final Random mRandom;
     private String mHost = "localhost";
     private int mPort = 9393;
     private TcpIpConnectionTypes mConnectionType = TcpIpConnectionTypes.Plain;
-    private NumberFormat mNumFmt;
+    private final NumberFormat mNumFmt;
 
     public static void main( String[] pArgs) {
         Client c = new Client();
@@ -73,8 +75,7 @@ public class Client implements TcpIpConnectionCallbackInterface
                 mMsgsToSent = Integer.parseInt( pArgs[i+1]);
                 i++;
             }
-
-            if (pArgs[i].equalsIgnoreCase("-chars")) {
+            if (pArgs[i].equalsIgnoreCase("-charSpan")) {
                 mCharacterSpan = Integer.parseInt( pArgs[i+1]);
                 i++;
             }
@@ -154,10 +155,12 @@ public class Client implements TcpIpConnectionCallbackInterface
 
     private void startBounceData()
     {
+        mStartTime = System.nanoTime();
         mMsgSent = 0;
         mMessage = buildMessage();
+
         try {
-            System.out.println("Sending message: " + mMessage.length());
+            //System.out.println("Sending message: " + mMessage.length());
             mClient.write(mMessage.getBytes(), true);
         }
         catch( IOException e) {
@@ -183,16 +186,28 @@ public class Client implements TcpIpConnectionCallbackInterface
         mMsgSent++;
         mBytesSent += pBuffer.length;
         if (mMsgSent == mMsgsToSent) {
-            log("All "+ mMsgsToSent + " messages being sent, exiting the program");
+            long uSec = (System.nanoTime() - mStartTime) / 1000L;
+            long msg_sec = (mMsgSent * 1000_000L) / uSec;
+            long kbytes_sec = (mBytesSent * 1000_000L) / (uSec * 1000);
+            long usec_bounce = uSec / mMsgSent;
+
+            log( String.format("All %d, msgs/sec: %d,   kb/sec: %d,     %d usec per bounce (xta/rcv)",
+                        mMsgSent,  msg_sec, kbytes_sec, usec_bounce));
+
             pConnection.close();
             System.exit(0);
         }
 
-        if (isCompressed() && ((mMsgSent % 1000) == 0)) {
-            log(" -- Messages sent " + mMsgSent
-                    + " out compression rate " + mNumFmt.format(100.0d * pConnection.getOutputCompressionRate())
-                            + "% in compression rate " + mNumFmt.format( 100.0d *pConnection.getInputCompressionRate()) + "%" );
+        if ((mMsgSent % 5000) == 0) {
+            if (isCompressed()) {
+                log(" -- Messages sent " + mMsgSent
+                        + " out compression rate " + mNumFmt.format(100.0d * pConnection.getOutputCompressionRate())
+                        + "% in compression rate " + mNumFmt.format(100.0d * pConnection.getInputCompressionRate()) + "%");
+            } else {
+                log(" -- Messages sent " + mMsgSent);
+            }
         }
+
 
         if (mVerifyMessage) {
             String tRcvMessage = new String( pBuffer );
@@ -202,7 +217,7 @@ public class Client implements TcpIpConnectionCallbackInterface
         }
         mMessage = buildMessage();
         try {
-            System.out.println("Sending message: " + mMessage.length());
+            //System.out.println("Sending message: " + mMessage.length());
             pConnection.write(mMessage.getBytes(), true);
         }
         catch( IOException e) {

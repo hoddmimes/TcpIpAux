@@ -1,19 +1,73 @@
-group 'com.hoddmimes.tcpipaux'
-version '1.0-SNAPSHOT'
-
-apply plugin: 'java'
+plugins {
+    id 'java'
+}
 
 sourceCompatibility = 1.8
+version = 1.1
+
+configurations {
+    jaxDoclet
+}
 
 repositories {
     mavenCentral()
 }
 
-javadoc {
-    source = sourceSets.main.allJava
-    classpath = configurations.compile
+test {
+    exclude '**/*'
 }
 
+task buildJar (type: Jar) {
+    dependsOn(':compileTestJava')
+    archiveBaseName = 'tcpip-aux'
+    destinationDirectory = file("./")
+    archiveVersion = "$version"
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    } with jar
+
+
+    exclude "META-INF/*.SF"
+    exclude "META-INF/*.DSA"
+    exclude "META-INF/*.RSA"
+
+    duplicatesStrategy = 'exclude'
+
+    manifest {
+        attributes 'Implementation-Title': 'TcpIpAux', 'Implementation-Version': archiveVersion
+    }
+
+    from('build/classes') {
+        include '**/*.class'
+    }
+
+    doLast {
+        def tcpipJar ="tcpip-aux-" + "$version" + ".jar"
+        print("***** Built JAR $tcpipJar")
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.deprecation = true
+}
+
+task deleteJar( type: Delete ) {
+    delete fileTree('./') {
+        include 'tcpip-aux-*.jar'
+    }
+
+    doLast {
+        print("***** Delete tcpip-aux-*.jar")
+    }
+
+}
+
+classes.finalizedBy(buildJar)
+clean.dependsOn(deleteJar)
+
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testImplementation 'junit:junit:4.13.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
