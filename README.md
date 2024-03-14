@@ -20,8 +20,4 @@ A client and server sample is found in the package com.hoddmimes.tcpip.sample
 * [Client Sample] (https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Client.java)
 * [Server Sample] (https://github.com/hoddmimes/TcpIpAux/blob/master/src/main/java/com/hoddmimes/tcpip/sample/Server.java)
 
-```sequence
-Alice->Bob: Hello Bob, how are you?
-Note right of Bob: Bob thinks
-Bob-->Alice: I am good thanks!
-```
+
