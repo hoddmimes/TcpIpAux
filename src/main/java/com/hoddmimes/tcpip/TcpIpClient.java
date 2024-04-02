@@ -1,24 +1,16 @@
 package com.hoddmimes.tcpip;
 
-import com.hoddmimes.tcpip.crypto.CBCBlockCipher;
+import com.hoddmimes.tcpip.impl.Signer;
 import com.hoddmimes.tcpip.messages.IncompatibleConnectionException;
 
-import java.io.DataInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.security.KeyStore;
-import java.util.zip.ZipInputStream;
+import java.security.GeneralSecurityException;
+import java.security.Security;
 //import java.security.cert.Certificate;
 //import java.util.Enumeration;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
-
 
 
 /**
@@ -38,8 +30,8 @@ public class TcpIpClient
 	 * @throws IncompatibleConnectionException  thrown when connecting to a server being started to accept s specific
 	 * features i.e. plain, compressed, encrypted or eompressed_encrypted connections.
 	 */
-	public static TcpIpConnectionInterface connect(String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException {
-		return TcpIpClient.connect(TcpIpConnectionTypes.Plain, pHost, pPort, pCallback);
+	public static TcpIpConnectionInterface connect(String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,GeneralSecurityException,IncompatibleConnectionException {
+		return TcpIpClient.connect(TcpIpConnectionTypes.PLAIN, pHost, pPort, pCallback);
 	}
 
 	/**
@@ -53,9 +45,14 @@ public class TcpIpClient
 	 * @throws IncompatibleConnectionException thrown when connecting to a server being started to accept s specific
 	 * features i.e. plain, compressed, encrypted or eompressed_encrypted connections.
 	 */
-	public static TcpIpConnectionInterface connect(TcpIpConnectionTypes pConnectionType,
-			String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException
+	public static TcpIpConnectionInterface connect(int pConnectionType,
+			String pPrivateKeyFilename, String pKeyFilePassword,
+			String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException, GeneralSecurityException
 	{
+			Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+
+			Signer mSigner = (pPrivateKeyFilename != null) ? new Signer( pPrivateKeyFilename, pKeyFilePassword) : null;
+
 
 			SocketAddress tEndpointAddress = new InetSocketAddress(pHost, pPort);
 			Socket tSocket = new Socket();
@@ -63,6 +60,7 @@ public class TcpIpClient
 
 		TcpIpConnection tTcpIpConnection =  new TcpIpConnection(
 				tSocket,
+				mSigner,
 				TcpIpConnection.ConnectionDirection.Out, 
 				pConnectionType, 
 				pCallback);
@@ -71,5 +69,11 @@ public class TcpIpClient
 			tTcpIpConnection.start();
 
         return tTcpIpConnection;
+	}
+
+	public static TcpIpConnectionInterface connect(int pConnectionType,
+												   String pHost, int pPort, TcpIpConnectionCallbackInterface pCallback) throws IOException,IncompatibleConnectionException, GeneralSecurityException
+	{
+		return TcpIpClient.connect( pConnectionType, null, null, pHost, pPort, pCallback );
 	}
 }

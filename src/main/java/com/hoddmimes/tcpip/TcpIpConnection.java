@@ -6,6 +6,10 @@ import com.hoddmimes.tcpip.crypto.EncryptOutputStream;
 import com.hoddmimes.tcpip.impl.*;
 import com.hoddmimes.tcpip.messages.*;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -13,6 +17,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,7 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 	private int mIndex;
 	private Date mConnectionTime;
 	private Object mUserCntx;
-	private TcpIpConnectionTypes mConnectionType;
+	private int mConnectionType;
 	private ConnectionDirection mConnectionDirection;
 	private boolean mClientServerCompatible;
 
@@ -59,26 +66,31 @@ import java.util.concurrent.atomic.AtomicInteger;
 	private volatile DataInputStream  mInSocket;
 	private volatile DataOutputStream mOutSocket;
 
+	private Signer mSigner;
+
+	private volatile String mDbgInfo = null;
 	/**
 	 * Create and initiated a TCP/IP wrapper. A TcpIpConnection returned when a connection is outbound initiated
 	 * see {@link TcpIpClient#connect TcpIpClient.connect} or when a server is accepting and inbound connection
 	 * see {@link TcpIpServerCallbackInterface#tcpipInboundConnection TcpIpConnectionInterface} inbound connection}
 	 * @param pSocket
+	 * @param pSigner
 	 * @param pConnectionDirection
 	 * @param pConnectionType
 	 * @param pCallback
 	 */
-	TcpIpConnection( Socket pSocket, 
-			ConnectionDirection pConnectionDirection, 
-			TcpIpConnectionTypes pConnectionType, 
-			TcpIpConnectionCallbackInterface pCallback) {
+	TcpIpConnection( Socket pSocket,
+					 Signer pSigner,
+					 ConnectionDirection pConnectionDirection,
+					 int pConnectionType,
+					 TcpIpConnectionCallbackInterface pCallback) {
 		mSocket = pSocket;
+		mSigner = pSigner;
 		mConnectionDirection = pConnectionDirection;
 		mCallback = pCallback;
 		mClosedCalled = false;
 		mConnectionType = pConnectionType;
 		mClientServerCompatible = true; // let us assume that we are compatible i.e. version and connection type
-
 
 
 		mConnectionTime = new Date();
@@ -93,10 +105,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 		}
 	}
 
-	private void trace( String pText ) {
-		//System.out.println("[" + mConnectionDirection +"] " + pText + " thread: " + this.getName());
+
+
+	public TcpIpConnection( Socket pSocket,
+							ConnectionDirection pConnectionDirection,
+							int pConnectionType,
+							TcpIpConnectionCallbackInterface pCallback) {
+		this( pSocket, null, pConnectionDirection, pConnectionType, pCallback);
 	}
 
+	private void trace( String pText ) {
+
+	}
+
+	private IvParameterSpec generateIV(SecretKeySpec tKey ) {
+		try {
+			MessageDigest md = MessageDigest.getInstance("MD5");
+			return new IvParameterSpec(md.digest(tKey.getEncoded()));
+		}
+		catch( Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 	/**
 	 * Initialize the communication with the server/client counter party.
 	 * Server, may be configured to force a protocol stack (i.e. compressin and/or encryption) or accept whatever the client chose
@@ -105,20 +135,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 	 *
 	 * If the connection is a outbound(client) connection, the client will send a {@link InitMsgRqst InitMsgRqst}, specifying version, connection type and
 	 * encryption parameters if encryption is enabled.
-	 * The server will response with a {@link InitMsgRsp InitMsgRsp } flag indicating whatever it accept the client or not, error message if applicable and
+	 * The server will respond with a {@link InitMsgRsp InitMsgRsp } flag indicating whatever it accepts the client or not, error message if applicable and
 	 * its encryption parameters is encryption should be used.
 	 *
 	 * @throws IOException, error in transmission
 	 * @throws IncompatibleConnectionException, server incompatible with what the client requests
 	 */
-	protected  void init() throws IOException, IncompatibleConnectionException
+	protected  void init() throws IOException, IncompatibleConnectionException, GeneralSecurityException
 	{
 
 		DH tDHData = (isClient()) ? synchronizeParametersWithServer() : synchronizeParametersWithClient();
 
-		if (isEncrypted()) {
-			mIn = new DataInputStream(new DecryptInputStream(mSocket.getInputStream(), tDHData.getSharedSecretKey()));
-			mOut = new DataOutputStream(new EncryptOutputStream(mSocket.getOutputStream(), tDHData.getSharedSecretKey()));
+		if (tDHData != null) {
+			Cipher tInCipher = Cipher.getInstance("AES/CBC/PKCS5Padding", "BC");
+			Cipher tOutCipher = Cipher.getInstance("AES/CBC/PKCS5Padding", "BC");
+			//System.out.println("direction: " + this.mConnectionDirection.toString() + " key: " + Hex.toHexString(tDHData.getSharedSecretKey().getEncoded()) + "  IV: " + Hex.toHexString(generateIV(tDHData.getSharedSecretKey()).getIV()));
+			tInCipher.init( Cipher.DECRYPT_MODE, tDHData.getSharedSecretKey(), generateIV(tDHData.getSharedSecretKey()));
+			tOutCipher.init(Cipher.ENCRYPT_MODE, tDHData.getSharedSecretKey(), generateIV(tDHData.getSharedSecretKey()));
+
+
+			mIn = new DataInputStream(new DecryptInputStream(mSocket.getInputStream(), tInCipher ));
+			mOut = new DataOutputStream(new EncryptOutputStream(mSocket.getOutputStream(), tOutCipher ));
 		} else {
 			mIn = new DataInputStream(mSocket.getInputStream());
 			mOut = new DataOutputStream(mSocket.getOutputStream());
@@ -127,7 +164,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 		// If Compression requested
 
 		if (isCompressed()) {
-
 			mCompStatInputStream = new ByteCountingInputStream( mIn );
 			mCompStatOutputStream = new ByteCountingOutputStream( mOut );
 
@@ -147,7 +183,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 
-	private DH synchronizeParametersWithServer() throws IOException, IncompatibleConnectionException
+	private DH synchronizeParametersWithServer() throws IOException, IncompatibleConnectionException, GeneralSecurityException
 	{
 		DH tDHKeys = null;
 
@@ -158,17 +194,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 			tDHKeys = new DH( G, P ); //
 		}
 
-		InitMsgRqst tRqst = (isEncrypted()) ? new InitMsgRqst( mConnectionType, tDHKeys.getG(), tDHKeys.getP(), tDHKeys.getPublicKey()) : new InitMsgRqst( mConnectionType );
+		byte[] tEncodedPublicSSHKey = (mSigner == null) ? null : mSigner.clientGetPublicKeyEncoded();
 
-		byte[] tNetMsg = tRqst.encode();
+		InitMsgRqst tRqst = (isEncrypted()) ? new InitMsgRqst( mConnectionType,  tDHKeys.getG(), tDHKeys.getP(), tDHKeys.getPublicKey(), tEncodedPublicSSHKey) : new InitMsgRqst( mConnectionType, tEncodedPublicSSHKey);
+
+
+		byte[] tNetMsgBytes = tRqst.encode();
 
 		DataInputStream tIn = new DataInputStream( mSocket.getInputStream());
 		DataOutputStream tOut = new DataOutputStream( mSocket.getOutputStream());
 
 		// Send init request
-		tOut.writeInt(tNetMsg.length);
-		tOut.write( tNetMsg );
+		tOut.writeInt(tNetMsgBytes.length);
+		tOut.write( tNetMsgBytes );
 		tOut.flush();
+
+		// If authorization is enabled
+		if ((mConnectionType & TcpIpConnectionTypes.SSH_SIGNING) != 0) {
+			byte[] tInitMsgSign = this.mSigner.clientSignMessage( tNetMsgBytes );
+			// Send init sign message
+			tOut.writeInt(tInitMsgSign.length);
+			tOut.write( tInitMsgSign );
+			tOut.flush();
+
+		}
 
 		int tSize = tIn.readInt();
 		byte[] tBuffer = new byte[ tSize ];
@@ -179,8 +228,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 			throw new IncompatibleConnectionException(tRsp.getErrorText());
 		}
 		if (isEncrypted()) {
-			tDHKeys.calculateSharedKey( tRsp.getClientPubKey());
+			tDHKeys.calculateSharedKey( tRsp.getServerDHPubKey());
 		}
+
 		return tDHKeys;
 	}
 
@@ -188,42 +238,67 @@ import java.util.concurrent.atomic.AtomicInteger;
 		boolean tAccepted = true;
 		String tErrorText = null;
 		DH tDHData = null;
+		byte[] tChallange = null;
 
 
 		DataInputStream tIn = new DataInputStream(mSocket.getInputStream());
 		DataOutputStream tOut = new DataOutputStream(mSocket.getOutputStream());
 
 		/**
-		 * read message message size. Check whatever the size of the following user data is resonable
+		 * read message  size. Check whatever the size of the following user data is resonable
 		 * If not just ignore the connection.
 		 */
 		int tSize = tIn.readInt();
 		if ((tSize <= 0) && (tSize >= 4096)) {
-			throw new IOException("tcpIpAux: Most likely an intial garbage message");
+			throw new IOException("tcpIpAux: Most likely an initial garbage message");
 		}
-		byte[] tBuffer = new byte[tSize];
-		tIn.readFully(tBuffer);
-		InitMsgRqst tInitMsgRqst = new InitMsgRqst(new MessageDecoder(tBuffer));
+		byte[] tClientInitMsgBuffer = new byte[tSize];
+		tIn.readFully(tClientInitMsgBuffer);
+		InitMsgRqst tInitMsgRqst = new InitMsgRqst(new MessageDecoder(tClientInitMsgBuffer));
 
-		// Check version
-		if (tInitMsgRqst.getVersion() != Version.VERSION) {
-			tAccepted = false;
-			tErrorText = "Client/Server versions are incompatible";
-		} else {
-			// Check connection type
-			if (this.mConnectionType == null) {
-				// server accepts whatever client chose
-				this.mConnectionType = tInitMsgRqst.getConnectionType();
-			} else if (this.mConnectionType != tInitMsgRqst.getConnectionType()) {
-				tAccepted = false;
-				tErrorText = "Client/Server incompatible feature stacks";
+		try {
+			// Check that the client request is compatiable with what the server has to offer
+			if (tInitMsgRqst.getVersion() != Version.VERSION) {
+				throw new VerifyError("Client/Server versions are incompatible");
 			}
+			// Check connection type
+			if ((this.mConnectionType != 0) && (this.mConnectionType != tInitMsgRqst.getConnectionType())) {
+				throw new VerifyError("Client/Server incompatible feature stack");
+			}
+			if (this.mConnectionType == 0) {
+				this.mConnectionType = tInitMsgRqst.getConnectionType();
+			}
+			// Check  Authorization
+			if ((tInitMsgRqst.getConnectionType() & TcpIpConnectionTypes.SSH_SIGNING) != 0) {
+				if (mSigner == null) {
+					throw new VerifyError("Server is not started with SSH signing verification");
+				}
+				PublicKey tClientPublicSSHKey = this.mSigner.serverGetClientPublicKey(tInitMsgRqst.getEncodedPublicSSHKey());
+				if (tClientPublicSSHKey == null) {
+					throw new VerifyError("Client public key is not found");
+				}
+				tSize = tIn.readInt();
+				byte[] tInitMsgSign = new byte[ tSize ];
+				tIn.readFully(tInitMsgSign);
+				if (!this.mSigner.serverVerifyMessage( tClientInitMsgBuffer,  tClientPublicSSHKey, tInitMsgSign)) {
+					throw new VerifyError("Invalid init message sign");
+				} else {
+					System.out.println("Client SSH signed message verified");
+				}
+			}
+
 		}
+		catch( VerifyError e) {
+			tAccepted = false;
+			tErrorText = e.getMessage();
+		}
+
 
 		InitMsgRsp tResponse = null;
-		if (isEncrypted()) {
+
+		if (((tInitMsgRqst.getConnectionType() & TcpIpConnectionTypes.ENCRYPT) != 0)  && tAccepted) {
 			tDHData = new DH(tInitMsgRqst.getCryptG(), tInitMsgRqst.getCryptP());
-			tDHData.calculateSharedKey(tInitMsgRqst.getClientPubKey());
+			tDHData.calculateSharedKey(tInitMsgRqst.getClientDHPubKey());
 			tResponse =  new InitMsgRsp( tDHData.getPublicKey(), tAccepted, tErrorText);
 		} else {
 			tResponse =  new InitMsgRsp( null, tAccepted, tErrorText);
@@ -237,6 +312,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 		if (!tAccepted) {
 			throw new IncompatibleClassChangeError(tErrorText);
 		}
+
 		return tDHData;
 	}
 
@@ -254,14 +330,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 	}
 
 	private boolean isCompressed() {
-		if ((mConnectionType == TcpIpConnectionTypes.Compression) || (mConnectionType == TcpIpConnectionTypes.Compression_Encrypt)) {
+		if ((mConnectionType & TcpIpConnectionTypes.COMPRESS) != 0) {
+			return true;
+		}
+		return false;
+	}
+	private boolean isAuthorize() {
+		if ((mConnectionType & TcpIpConnectionTypes.SSH_SIGNING) != 0) {
 			return true;
 		}
 		return false;
 	}
 
 	private boolean isEncrypted() {
-		if ((mConnectionType == TcpIpConnectionTypes.Encrypt) || (mConnectionType == TcpIpConnectionTypes.Compression_Encrypt)) {
+		if ((mConnectionType & TcpIpConnectionTypes.ENCRYPT) != 0) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean isSigning() {
+		if ((mConnectionType & TcpIpConnectionTypes.SSH_SIGNING) != 0) {
 			return true;
 		}
 		return false;
@@ -429,6 +518,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 		while (!mClosedCalled) {
+
+
 			try {
 
 				int tMagicalSign = mIn.readInt();

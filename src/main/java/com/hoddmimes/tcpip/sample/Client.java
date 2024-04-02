@@ -32,7 +32,7 @@ public class Client implements TcpIpConnectionCallbackInterface
     private final Random mRandom;
     private String mHost = "localhost";
     private int mPort = 9393;
-    private TcpIpConnectionTypes mConnectionType = TcpIpConnectionTypes.Plain;
+    private int mConnectionType = 0;
     private final NumberFormat mNumFmt;
 
     public static void main( String[] pArgs) {
@@ -55,7 +55,7 @@ public class Client implements TcpIpConnectionCallbackInterface
 
     private void parseParameters( String[] pArgs ) {
         int i = 0;
-        boolean tPlain = false, tCompression = false, tEncrypt = false;
+
 
         while( i < pArgs.length ) {
             if (pArgs[i].equalsIgnoreCase("-verify")) {
@@ -89,40 +89,39 @@ public class Client implements TcpIpConnectionCallbackInterface
                 i++;
             }
             if (pArgs[i].equalsIgnoreCase("-compress")) {
-                tCompression = true;
+                mConnectionType += TcpIpConnectionTypes.COMPRESS;
             }
             if (pArgs[i].equalsIgnoreCase("-encrypt")) {
-                tEncrypt = true;
+                mConnectionType += TcpIpConnectionTypes.ENCRYPT;
             }
             if (pArgs[i].equalsIgnoreCase("-plain")) {
-                tCompression = true;
+                mConnectionType += TcpIpConnectionTypes.PLAIN;
+            }
+            if (pArgs[i].equalsIgnoreCase("-signing")) {
+                mConnectionType += TcpIpConnectionTypes.SSH_SIGNING;
             }
             i++;
         }
+        try {
+            TcpIpConnectionTypes.validate( mConnectionType );
+        }
+        catch(IOException e) {
+            e.printStackTrace();
+        }
+
         if (mMinMsgSize > mMaxMsgSize) {
             System.out.println("-minSize must <=  -maxSize");
             System.exit(0);
         }
 
-        if (tPlain && tCompression && tEncrypt) {
-            System.out.println("Either -plain, -encrypt, -compression or -encrypt and -compression");
-            System.exit(0);
-        }
-
-        if (tPlain) {
-            mConnectionType = TcpIpConnectionTypes.Plain;
-        } else if (tCompression && tEncrypt) {
-            mConnectionType = TcpIpConnectionTypes.Compression_Encrypt;
-        } else if (tCompression) {
-            mConnectionType = TcpIpConnectionTypes.Compression;
-        } else if (tEncrypt) {
-            mConnectionType = TcpIpConnectionTypes.Encrypt;
-        }
     }
 
     private void connectToServer() {
         try {
-            mClient = TcpIpClient.connect( mConnectionType, mHost, mPort, this );
+            String tSSHPrivateKeyFile = (isSigningEnabled()) ? "./id_rsa_with_password_foobar" : null;
+            String tSSHKeyFilePassword = (isSigningEnabled()) ? "foobar" : null;
+
+            mClient = TcpIpClient.connect( mConnectionType, tSSHPrivateKeyFile, tSSHKeyFilePassword, mHost, mPort, this );
             log("Sucessfully connected to " + mHost + " on port " + mPort );
         }
         catch( Exception e) {
@@ -132,7 +131,14 @@ public class Client implements TcpIpConnectionCallbackInterface
     }
 
     private boolean isCompressed() {
-        if ((mConnectionType == TcpIpConnectionTypes.Compression_Encrypt) || (mConnectionType == TcpIpConnectionTypes.Compression)) {
+        if ((mConnectionType & TcpIpConnectionTypes.COMPRESS) != 0) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSigningEnabled() {
+        if ((mConnectionType & TcpIpConnectionTypes.SSH_SIGNING) != 0) {
             return true;
         }
         return false;

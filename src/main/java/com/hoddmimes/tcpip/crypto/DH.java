@@ -1,6 +1,15 @@
 package com.hoddmimes.tcpip.crypto;
 
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.jcajce.provider.digest.SHA3;
+
+import javax.crypto.KeyGenerator;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +37,7 @@ public class DH {
 
     public DH(BigInteger pCommonBase, BigInteger pPrime) {
         mSecretKey = null;
-        SecureRandom tSecureRandom = SecureRandomFactory.getInstance();
+        SecureRandom tSecureRandom = new SecureRandom();
         mCommonBase = pCommonBase;
         mPrime = pPrime;
 
@@ -47,51 +56,19 @@ public class DH {
 
     public byte[] calculateSharedKey(BigInteger pClientPublicKey) {
         BigInteger tSharedKey = pClientPublicKey.modPow(mMySecretKey, mPrime);
-        //System.out.println("shared-key: " + tSharedKey.toString(16));
 
-        String tKeyStr = tSharedKey.toString(16);
-        //System.out.println("Length: " + tKeyStr.length());
-
-        mSecretKey = new byte[32]; // 256 bits
-
-        if (tKeyStr.length() >= 128) {
-            int tSegments = tKeyStr.length() / 64;
-            List<BigInteger> tBIV = new ArrayList();
-            for( int i = 0; i < tSegments; i++)
-            {
-                tBIV.add( new BigInteger( tKeyStr.substring(i*64, (i+1) * 64), 16));
-            }
-            BigInteger tKey = tBIV.get(0);
-            for( int i = 1; i < tBIV.size(); i++) {
-                tKey = tKey.xor( tBIV.get(i));
-            }
-            tKeyStr = tKey.toString(16);
-            //System.out.println(" tKey Length: " + tKeyStr.length());
-            //System.out.println("shared-key: " + tKeyStr );
-
-
-            for( int i = 0; i < 32; i++ ) {
-                mSecretKey[i] = (byte) (Integer.parseInt(tKeyStr.substring(i*2, (i+1)*2), 16) & 0xff);
-            }
-        } else {
-            MyRandom tRandom = new MyRandom(tSharedKey.longValue());
-            byte[] tSharedKeyBytes = tSharedKey.toByteArray();
-            int tSharedKeySize = tSharedKeyBytes.length;
-            for (int i = 0; ((i < tSharedKeySize) && (i < mSecretKey.length)); i++) {
-                mSecretKey[i] = tSharedKeyBytes[i];
-            }
-
-            byte[] tFiller = new byte[mSecretKey.length];
-            tRandom.nextBytes(tFiller);
-
-            for (int i = tSharedKeySize; i < mSecretKey.length; i++) {
-                mSecretKey[i] = tFiller[i];
-            }
+        try {
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        byte[] tSalt = md.digest(tSharedKey.toByteArray());
+        PKCS5S2ParametersGenerator tGen = new PKCS5S2ParametersGenerator(new SHA256Digest());
+        tGen.init( tSharedKey.toByteArray(), tSalt, 4096);
+        mSecretKey =  ((KeyParameter) tGen.generateDerivedParameters(256)).getKey();
         }
-
+        catch( Exception e) {
+            throw new RuntimeException(e);
+        }
         return mSecretKey;
     }
-
 
 
 
@@ -100,48 +77,12 @@ public class DH {
         return new BigInteger("3");
     }
 
-
-
     public BigInteger getP() {
         return mPrime;
     }
 
-    public byte[] getSharedSecretKey() {
-        return mSecretKey;
-    }
-
-    static class MyRandom {
-        long mSeed;
-
-        MyRandom(long pSeed) {
-            mSeed = pSeed;
-        }
-
-
-        void nextBytes(byte[] pBytes) {
-            int tRandom;
-            // Do a little bit unrolling of the above algorithm.
-            int max = pBytes.length & ~0x3;
-            for (int i = 0; i < max; i += 4) {
-                tRandom = next(32);
-                pBytes[i] = (byte) tRandom;
-                pBytes[i + 1] = (byte) (tRandom >> 8);
-                pBytes[i + 2] = (byte) (tRandom >> 16);
-                pBytes[i + 3] = (byte) (tRandom >> 24);
-            }
-            if (max < pBytes.length) {
-                tRandom = next(32);
-                for (int j = max; j < pBytes.length; j++) {
-                    pBytes[j] = (byte) tRandom;
-                    tRandom >>= 8;
-                }
-            }
-        }
-
-        private int next(int pBits) {
-            mSeed = (mSeed * 0x5DEECE66DL + 0xBL) & ((1L << 48) - 1);
-            return (int) (mSeed >>> (48 - pBits));
-        }
+    public SecretKeySpec getSharedSecretKey() throws NoSuchAlgorithmException {
+        return new SecretKeySpec(mSecretKey,"AES");
     }
 
 

@@ -67,7 +67,16 @@ classes.finalizedBy(buildJar)
 clean.dependsOn(deleteJar)
 
 dependencies {
+    implementation group: 'org.bouncycastle', name: 'bcprov-jdk18on', version: '1.71'
+    implementation group: 'org.bouncycastle', name: 'bcpkix-jdk18on', version: '1.77'
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
-    testImplementation 'junit:junit:4.13.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    testImplementation group: 'org.junit.platform', name: 'junit-platform-suite-api', version: '1.10.2'
+    implementation group: 'org.junit.platform', name: 'junit-platform-commons', version: '1.10.2'
+    testImplementation group: 'org.junit.platform', name: 'junit-platform-engine', version: '1.10.2'
+
+
+
 }

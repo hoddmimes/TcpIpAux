@@ -10,13 +10,12 @@ public class Server implements TcpIpConnectionCallbackInterface, TcpIpServerCall
 {
     private static SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
-    private TcpIpConnectionTypes mConnectionType = null;
+    private int mConnectionType = 0;
     private int mPort = 9393;
     private TcpIpServer mServer;
 
     private void parseParameters( String[] pArgs ) {
         int i = 0;
-        boolean tPlain = false, tCompression = false, tEncrypt = false;
 
         while( i < pArgs.length ) {
             if (pArgs[i].equalsIgnoreCase("-port")) {
@@ -24,29 +23,25 @@ public class Server implements TcpIpConnectionCallbackInterface, TcpIpServerCall
                i++;
             }
             if (pArgs[i].equalsIgnoreCase("-compression")) {
-                tCompression = true;
+                mConnectionType += TcpIpConnectionTypes.COMPRESS;
             }
             if (pArgs[i].equalsIgnoreCase("-encrypt")) {
-                tEncrypt = true;
+                mConnectionType += TcpIpConnectionTypes.ENCRYPT;
             }
             if (pArgs[i].equalsIgnoreCase("-plain")) {
-                tCompression = true;
+                mConnectionType += TcpIpConnectionTypes.PLAIN;
+            }
+            if (pArgs[i].equalsIgnoreCase("-ssh-auth")) {
+                mConnectionType += TcpIpConnectionTypes.SSH_SIGNING;
             }
             i++;
         }
-        if (tPlain && tCompression && tEncrypt) {
-            System.out.println("Either -plain, -encrypt, -compression or -encrypt and -compression");
-            System.exit(0);
+        try{
+            TcpIpConnectionTypes.validate( mConnectionType );
         }
-
-        if (tPlain) {
-            mConnectionType = TcpIpConnectionTypes.Plain;
-        } else if (tCompression && tEncrypt) {
-            mConnectionType = TcpIpConnectionTypes.Compression_Encrypt;
-        } else if (tCompression) {
-            mConnectionType = TcpIpConnectionTypes.Compression;
-        } else if (tEncrypt) {
-            mConnectionType = TcpIpConnectionTypes.Encrypt;
+        catch( IOException e) {
+            e.printStackTrace();
+            System.exit(0);
         }
     }
 
@@ -57,19 +52,19 @@ public class Server implements TcpIpConnectionCallbackInterface, TcpIpServerCall
     private void startServer( )
     {
         try {
-            mServer = new TcpIpServer( mConnectionType, mPort, null, this );
+            mServer = new TcpIpServer( mConnectionType, "./", mPort, null, this );
         }
         catch( IOException e) {
           log("Failed to start server, error: " + e.getMessage());
            e.printStackTrace();
         }
 
-        if (mConnectionType == null) {
-            log("Sucessfully started server, listning on port: " + mPort +
+        if (mConnectionType == 0) {
+            log("Successfully started server, listning on port: " + mPort +
                     "\n   Connection type is not defined, client decides");
         } else {
-            log("Sucessfully started server, listning on port: " + mPort +
-                    "\n   connection types: " + mConnectionType.toString() );
+            log("Successfully started server, listning on port: " + mPort +
+                    "\n   connection types: " + TcpIpConnectionTypes.toString(mConnectionType));
         }
     }
 

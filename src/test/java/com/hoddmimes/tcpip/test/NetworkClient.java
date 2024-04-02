@@ -11,7 +11,6 @@ import java.util.Random;
 
 public class NetworkClient implements TcpIpConnectionCallbackInterface {
 
-
     private TcpIpConnectionInterface mConnection;
     private Object mCompleteSemaphore;
     private int mMsgSent = 10000;
@@ -22,8 +21,11 @@ public class NetworkClient implements TcpIpConnectionCallbackInterface {
     private Random mRandom;
     private Exception mException;
     private byte[] mCurrentMessage;
-    private TcpIpConnectionTypes mConnectionType;
+    private int mConnectionType;
     private volatile boolean mTrace;
+    private long mStartTime;
+    private long mBytesSent;
+    private long mLastNS = 0L;
 
     public NetworkClient() {
         mCompleteSemaphore = new Object();
@@ -33,24 +35,28 @@ public class NetworkClient implements TcpIpConnectionCallbackInterface {
 
     }
 
-    public Object test(TcpIpConnectionTypes pConnectionType) {
-        return test(pConnectionType, 10000, 1, 20000, (int) ('Z' - 'A'), false);
+    public Object test(int pConnectionType) {
+        return test(pConnectionType, null, null, 10000, 1, 20000, (int) ('Z' - 'A'), false);
     }
 
-    public Object test(TcpIpConnectionTypes pConnectionType, boolean pTrace) {
-        return test(pConnectionType, 10000, 1, 20000, (int) ('Z' - 'A'), pTrace);
+    public Object test(int pConnectionType, boolean pTrace) {
+        return test(pConnectionType, null, null, 10000, 1, 20000, (int) ('Z' - 'A'), pTrace);
     }
 
+    public Object test(int pConnectionType, int pMsgToSend, int pMsgMinSize, int pMsgMaxSize, int pCharacterSpan, boolean pTrace) {
+        return test( pConnectionType, null, null, pMsgToSend, pMsgMinSize, pMsgMaxSize,  pCharacterSpan, pTrace);
+    }
 
-    public Object test(TcpIpConnectionTypes pConnectionType, int pMsgToSend, int pMsgMinSize, int pMsgMaxSize, int pCharacterSpan, boolean pTrace) {
+    public Object test(int pConnectionType, String pPrivateKeyFilename, String pKeyFilePassword, int pMsgToSend, int pMsgMinSize, int pMsgMaxSize, int pCharacterSpan, boolean pTrace) {
         mTrace = pTrace;
         mConnectionType = pConnectionType;
         mMsgToSend = pMsgToSend;
         mMsgMaxSize = pMsgMaxSize;
         mMsgMinSize = pMsgMinSize;
         mCharacterSpan = pCharacterSpan;
+        mException = null;
         try {
-            mConnection = TcpIpClient.connect(pConnectionType, "localhost", 9393, this);
+            mConnection = TcpIpClient.connect(pConnectionType, pPrivateKeyFilename, pKeyFilePassword, "localhost", 9393, this);
             bounceData();
         } catch (Exception e) {
             mException = e;
@@ -59,7 +65,7 @@ public class NetworkClient implements TcpIpConnectionCallbackInterface {
     }
 
     private boolean isCompressed() {
-        if ((TcpIpConnectionTypes.Compression == mConnectionType) || (TcpIpConnectionTypes.Compression_Encrypt == mConnectionType)) {
+        if ((mConnectionType & TcpIpConnectionTypes.COMPRESS) != 0) {
             return true;
         }
         return false;
@@ -68,6 +74,9 @@ public class NetworkClient implements TcpIpConnectionCallbackInterface {
     private void bounceData() {
         try {
             mMsgSent = 0;
+            mStartTime = System.nanoTime();
+            mBytesSent = 0L;
+
             mCurrentMessage = buildMessage();
             synchronized (mCompleteSemaphore) {
                 mConnection.write(mCurrentMessage, true);
@@ -89,21 +98,37 @@ public class NetworkClient implements TcpIpConnectionCallbackInterface {
         return tBytes;
     }
 
+    private long usecDelta() {
+        if (mLastNS == 0) {
+            mLastNS = System.nanoTime();
+            return 0;
+        }
+        long nowNS = System.nanoTime();
+        long usec = (nowNS - mLastNS) / 1000L;
+        mLastNS = nowNS;
+        return usec;
+    }
 
     @Override
     public void tcpipMessageRead(TcpIpConnectionInterface pConnection, byte[] pBuffer) {
         mMsgSent++;
+        mBytesSent += pBuffer.length;
+
         if (mTrace) {
-            System.out.println("[Client] Msg sent: " + mMsgSent + " size: " + pBuffer.length);
+            System.out.println( usecDelta() + " usec  [Client] Msg sent: " + mMsgSent + " size bounced: " + mBytesSent);
         }
         if (mMsgSent == mMsgToSend) {
+            NumberFormat nf = NumberFormat.getNumberInstance();
+            nf.setMinimumFractionDigits(2);
+            nf.setMaximumFractionDigits(2);
+
+            long tRoundTripUsec = ((System.nanoTime() - mStartTime)  / 1000L) / mMsgSent;
+            double kb_sec = (double) mBytesSent / (double) ((System.nanoTime() - mStartTime) /1000L);
             if (isCompressed()) {
-                NumberFormat nf = NumberFormat.getNumberInstance();
-                nf.setMinimumFractionDigits(2);
-                nf.setMaximumFractionDigits(2);
                 System.out.println("  in compression rate: " + nf.format( 100.0d * pConnection.getInputCompressionRate()) +
                                    "%  out compression rate: " + nf.format( 100.0d * pConnection.getOutputCompressionRate()) + "%");
             }
+            System.out.println("All " + mMsgSent + " roundtrip: " + tRoundTripUsec + " usec  Kb/sec " + nf.format(kb_sec));
             closeAndNotify(pConnection, null);
         } else {
             if (!compareByteArrays(pBuffer, mCurrentMessage)) {

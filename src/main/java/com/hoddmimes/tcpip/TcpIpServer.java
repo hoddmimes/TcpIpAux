@@ -1,28 +1,27 @@
 package com.hoddmimes.tcpip;
 
-import java.io.FileInputStream;
+import com.hoddmimes.tcpip.impl.Signer;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.security.KeyStore;
 //import java.security.cert.Certificate;
 //import java.util.ArrayList;
 //import java.util.Enumeration;
-
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
 
 
 /**
  * Class for establishing a TCP/IP server listener.
  */
 public class TcpIpServer extends Thread {
-
 	private int mAcceptPort;
 	private TcpIpServerCallbackInterface mCallback;
 	private ServerSocket mServerSocket;
-	private TcpIpConnectionTypes mConnectionType;
+	private int mConnectionType;
+	private String mAuthPath;
+
+
 	private volatile boolean mCloseFlag;
 
 
@@ -35,7 +34,7 @@ public class TcpIpServer extends Thread {
 	 * @throws IOException exception signaled in case fatal error occurs when establishing and starting server
 	 */
 	public TcpIpServer(int pAcceptPort, TcpIpServerCallbackInterface pCallback) throws IOException {
-		this(null, pAcceptPort, null, pCallback);
+		this(0, null, pAcceptPort, null, pCallback);
 	}
 
 	/**
@@ -50,13 +49,16 @@ public class TcpIpServer extends Thread {
 	 * @param pCallback callback interface to be invoked when receiving inbound connection, messages read and fatal error notifications 
 	 * @throws IOException exception signaled in case fatal error occurs when establishing and starting server
 	 */
-	public TcpIpServer(TcpIpConnectionTypes pConnectionType, int pAcceptPort,
+	public TcpIpServer(int pConnectionType, String pAuthPath, int pAcceptPort,
 			String pAcceptInterface, TcpIpServerCallbackInterface pCallback) throws IOException {
 		mConnectionType = pConnectionType;
 		mAcceptPort = pAcceptPort;
 		mCallback = pCallback;
 		mCloseFlag = false;
-		
+		mAuthPath = pAuthPath;
+
+
+
 		InetAddress tAcceptInterface = (pAcceptInterface == null) ? InetAddress.getByName("0.0.0.0") : InetAddress.getByName(pAcceptInterface);
 		mServerSocket = new ServerSocket(mAcceptPort,20,tAcceptInterface);
 
@@ -80,8 +82,8 @@ public class TcpIpServer extends Thread {
 	 */
 	@Override
 	public void run() {
-		if (mConnectionType != null) {
-			setName("TcpIp Server [" + mConnectionType.toString() + "] on port " + mAcceptPort);
+		if (mConnectionType != 0) {
+			setName("TcpIp Server [" + TcpIpConnectionTypes.toString(mConnectionType ) + "] on port " + mAcceptPort);
 		} else {
 			setName("TcpIp Server [ Any Type ] on port " + mAcceptPort);
 		}
@@ -89,8 +91,10 @@ public class TcpIpServer extends Thread {
 			try {
 				Socket tSocket = mServerSocket.accept();
 
+				Signer mAuthorizer = (this.mAuthPath != null) ? new Signer( mAuthPath ) : null;
 
 				TcpIpConnection tConnection = new TcpIpConnection(tSocket,
+											mAuthorizer,
 											TcpIpConnection.ConnectionDirection.In,
 											mConnectionType, 
 											mCallback);
@@ -104,6 +108,7 @@ public class TcpIpServer extends Thread {
 			}
 		}
 	}
+
 
 	
 }

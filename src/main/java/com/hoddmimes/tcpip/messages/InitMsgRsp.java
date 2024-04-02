@@ -7,17 +7,22 @@ import java.math.BigInteger;
 public class InitMsgRsp
 {
     private int                     mVersion;
-    private BigInteger              mCrypt_ClientPubKey;
-    private boolean                 mSucces;
+    private BigInteger              mDH_PubKey;
+    private boolean                 mSuccess;
     private String                  mErrorText;
 
 
-    public InitMsgRsp( BigInteger pCrypt_ClientPubKey, boolean pSuccess, String pErrorText )
+
+    public InitMsgRsp( BigInteger pDH_ServerPubKey, boolean pSuccess, String pErrorText, byte[] pAuthChallange )
     {
         mVersion = Version.VERSION;
-        mCrypt_ClientPubKey = pCrypt_ClientPubKey;
-        mSucces = pSuccess;
+        mDH_PubKey = pDH_ServerPubKey;
+        mSuccess = pSuccess;
         mErrorText = pErrorText;
+    }
+
+    public InitMsgRsp( BigInteger pDH_ServerPubKey, boolean pSuccess, String pErrorText) {
+        this( pDH_ServerPubKey, pSuccess, pErrorText, null);
     }
 
 
@@ -30,16 +35,16 @@ public class InitMsgRsp
     public byte[] encode() {
        MessageEncoder tEncoder = new MessageEncoder();
        tEncoder.add( mVersion );
-       tEncoder.add( mCrypt_ClientPubKey );
-       tEncoder.add( mSucces );
+       tEncoder.add( mDH_PubKey );
+       tEncoder.add( mSuccess );
        tEncoder.add( mErrorText );
        return tEncoder.getBytes();
     }
 
     public void decode( MessageDecoder pDecoder ) {
         mVersion = pDecoder.readInt();
-        mCrypt_ClientPubKey = pDecoder.readBigInteger();
-        mSucces = pDecoder.readBoolean();
+        mDH_PubKey = pDecoder.readBigInteger();
+        mSuccess = pDecoder.readBoolean();
         mErrorText = pDecoder.readString();
     }
 
@@ -47,12 +52,12 @@ public class InitMsgRsp
         return mVersion;
     }
 
-    public BigInteger getClientPubKey() {
-        return mCrypt_ClientPubKey;
+    public BigInteger getServerDHPubKey()  {
+        return mDH_PubKey;
     }
 
     public boolean isAccepted() {
-        return mSucces;
+        return mSuccess;
     }
 
     public String getErrorText() {

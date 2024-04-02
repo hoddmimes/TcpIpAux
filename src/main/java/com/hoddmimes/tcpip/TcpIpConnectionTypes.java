@@ -1,5 +1,7 @@
 package com.hoddmimes.tcpip;
 
+import java.io.IOException;
+
 /**
  * Enumeration types defining types of connections that can be established
  * <ul>
@@ -10,31 +12,38 @@ package com.hoddmimes.tcpip;
  * </ul>
  */
 
-public enum TcpIpConnectionTypes 
+public class TcpIpConnectionTypes
 {
-	Plain(1), 				    // Vanilla tcp/ip socket no extravaganza
-	Encrypt(2), 				// AES 256 bit encrypted socket
-	Compression_Encrypt(3), 	// ZLIB compression over AES 256 bit encrypted socket
-	Compression(4);	 	        // ZLIB compression over a vanilla socket
+	public static int PLAIN = 1;
+	public static int ENCRYPT = 2;
+	public static int COMPRESS = 4;
+	public static int SSH_SIGNING = 8;
 
-	private final int mValue;
 
-	private TcpIpConnectionTypes(int value) {
-		this.mValue = value;
-	}
-
-	public static TcpIpConnectionTypes decode( int pValue ) {
-		switch( pValue ) {
-			case 1 : return TcpIpConnectionTypes.Plain;
-			case 2 : return TcpIpConnectionTypes.Encrypt;
-			case 3: return TcpIpConnectionTypes.Compression_Encrypt;
-			case 4 : return TcpIpConnectionTypes.Compression;
+	public static void validate(int pOptions) throws IOException{
+		if ((pOptions & (PLAIN+ENCRYPT)) != 0) {
+			throw new IOException("Connection must be PLAIN or ENCRYPTED can not be both");
 		}
-		return null;
 	}
 
-	public int encode() {
-		return this.mValue;
-	}
+	public static String toString( int pOptions ) {
+		StringBuilder sb = new StringBuilder();
+		if ((pOptions & PLAIN) != 0) {
+			sb.append("PLAIN,");
+		}
+		if ((pOptions & ENCRYPT) != 0) {
+			sb.append("ENCRYPT,");
+		}
+		if ((pOptions & COMPRESS) != 0) {
+			sb.append("COMPRESS,");
+		}
+		if ((pOptions & SSH_SIGNING) != 0) {
+			sb.append("SSH_SIGNING,");
+		}
 
+		if (sb.toString().length() > 1) {
+			return sb.toString().substring(0, sb.toString().length() - 1);
+		}
+		return "";
+	}
 }

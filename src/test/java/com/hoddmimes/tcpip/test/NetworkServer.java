@@ -11,7 +11,7 @@ public class NetworkServer implements TcpIpConnectionCallbackInterface, TcpIpSer
 {
     private static SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
-    private TcpIpConnectionTypes mConnectionType = null;
+    private int mConnectionType = 0;
     private int mPort = 9393;
     private TcpIpServer mServer;
     private volatile boolean mTrace;
@@ -29,23 +29,23 @@ public class NetworkServer implements TcpIpConnectionCallbackInterface, TcpIpSer
     {
         mTrace = pTrace;
         try {
-            mServer = new TcpIpServer( mConnectionType, mPort, null, this );
+            mServer = new TcpIpServer( mConnectionType, "./", mPort, null, this );
         }
         catch( IOException e) {
             log("Failed to start server, error: " + e.getMessage());
             e.printStackTrace();
         }
 
-        if (mConnectionType == null) {
+        if (mConnectionType == 0) {
             log("Sucessfully started server, listning on port: " + mPort +
                     "\n   Connection type is not defined, client decides");
         } else {
             log("Sucessfully started server, listning on port: " + mPort +
-                    "\n   connection types: " + mConnectionType.toString() );
+                    "\n   connection types: " + TcpIpConnectionTypes.toString(mConnectionType));
         }
     }
 
-    NetworkServer( TcpIpConnectionTypes pConnectionType )
+    NetworkServer( int pConnectionType )
     {
         mConnectionType = pConnectionType;
     }
